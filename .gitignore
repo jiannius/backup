@@ -1,0 +1,13 @@
+/vendor
+/node_modules
+/build
+.phpunit.result.cache
+/.phpunit.cache
+.env
+.env.backup
+/auth.json
+/.idea
+/.vscode
+/.zed
+/.fleet
+.DS_Store
