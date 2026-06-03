@@ -1,134 +1,122 @@
 # Jiannius Backup
 
-Database (and optional files) backup for jiannius Laravel projects: dump → upload to a filesystem disk → prune old archives, with a failure email. Supports SQLite, MySQL, and Postgres.
+[![tests](https://github.com/jiannius/backup/actions/workflows/tests.yml/badge.svg)](https://github.com/jiannius/backup/actions/workflows/tests.yml)
+[![lint](https://github.com/jiannius/backup/actions/workflows/lint.yml/badge.svg)](https://github.com/jiannius/backup/actions/workflows/lint.yml)
 
-> **Status:** package scaffolded from `jiannius/skeleton-package`; implementation pending. See `docs/superpowers/specs/2026-06-03-backup-package-design.md` for the design handoff.
+Scheduled database + files backup for Laravel apps: dump the database, zip it together with your configured folders, upload the archive to any Laravel filesystem disk, prune old archives — and email you when a backup fails.
+
+Supports **SQLite, MySQL, MariaDB, and PostgreSQL** via [spatie/db-dumper](https://github.com/spatie/db-dumper).
+
+## How it works
+
+Each run produces a single timestamped archive — `{app-slug}-2026-06-03-021500.zip` — containing:
+
+```
+db.sql                      # the database dump
+files/<absolute-path>/...   # every configured folder, full paths preserved
+```
+
+The archive is uploaded to the configured disk + path, then archives older than the retention period are pruned. Only this app's own archives (matching `{app-slug}-*.zip`) are ever deleted — unrelated files in a shared path are never touched.
+
+Every failure is logged, and emailed if a notification address is configured. The command exits non-zero so your scheduler marks the run as failed.
 
 ## Requirements
 
-- PHP 8.3+ and Composer
-- Everything else (Laravel 13, Testbench 11, Pest 4, Pint, Boost 2) installs as dependencies
+- PHP 8.3+ · Laravel 11+ host app
+- The dump binary for your database on the server: `sqlite3`, `mysqldump`, `mariadb-dump`, or `pg_dump` (set `database.binary_path` if it's not in `PATH`)
 
-## Development
+## Installation
 
-### There is no `artisan` — Testbench is the artisan
-
-A package is not an app, so it has no `artisan` binary. Orchestra Testbench's `vendor/bin/testbench` boots a throwaway Laravel app (configured by `testbench.yaml`, which registers this package's service provider) — so artisan commands, tests, and Laravel Boost all run inside a real app context.
-
-```bash
-composer test                                   # full Pest suite
-vendor/bin/pest tests/Feature/RouteTest.php     # one file
-vendor/bin/pest --filter='binds the backup'   # one test
-composer lint                                   # Pint (vendor/bin/pint)
-vendor/bin/testbench route:list                 # any artisan command
-vendor/bin/testbench tinker --execute='backup()->version();'
-vendor/bin/testbench serve                      # boot the throwaway app in a browser
-```
-
-Don't use `make:` generators — they scaffold into the throwaway Testbench app, not your package. Create files by copying the example files (see the how-to recipes below); they are the templates.
-
-### Tests
-
-Tests live in `tests/Feature` and `tests/Unit`, run on Pest 4, and extend `Tests\TestCase` (Orchestra Testbench + in-memory sqlite — wired automatically via `tests/Pest.php`). `RefreshDatabase` runs the package's own migrations, so model tests work with zero setup.
-
-### Code style
-
-Pint with Laravel defaults. Run `composer lint` (or `vendor/bin/pint --dirty`) after changing PHP files. CI runs both the suite (`.github/workflows/tests.yml`) and style check (`.github/workflows/lint.yml`) on pushes/PRs to `main`.
-
-## Laravel Boost
-
-Boost is installed as a dev dependency and runs through Testbench:
-
-- **MCP server** — `.mcp.json` (Claude Code) and `.cursor/mcp.json` (Cursor) launch `vendor/bin/testbench boost:mcp`. Your editor will ask once to approve the `laravel-boost` MCP server; after that, tools like `search-docs` (version-specific Laravel docs), `database-schema`, and `tinker` are available while working on the package.
-- **`vendor/bin/testbench boost:install`** — merges Boost's core guidelines with this repo's `.ai/guidelines/`. Note that Boost's core rules assume a host *app* with `artisan`, so `CLAUDE.md` carries package-adapted versions; review any regenerated block before committing it.
-
-## AI guidelines — two surfaces
-
-1. **`CLAUDE.md`** — guidance for agents working **on this package**: Testbench-as-artisan rules, PHP/test/style conventions (curated from `skeleton-project`), and the architecture map. The same content lives in `.ai/guidelines/backup.blade.php` so `boost:install` can merge it.
-2. **`resources/boost/guidelines/core.blade.php`** — guidance shipped **to consuming apps**. When a host app installs your package and lists it in its own `boost.json` `"packages"` array, Boost merges this file into the host app's `CLAUDE.md`. Keep it as copy-paste-ready usage guidance for someone building *with* your package (the included file shows the format — `@verbatim` + `<code-snippet>` blocks).
-
-## How-to recipes
-
-The example files are deliberately minimal and conventional — copy them as templates.
-
-### Add a config value
-
-Add the key to `config/backup.php`. It's merged in `register()` so `config('backup.*')` always works; host apps can override after `php artisan vendor:publish --tag=backup-config`. Read it anywhere via `backup()->config('key')`.
-
-### Add a model (+ migration + factory)
-
-Copy the trio: `src/Models/Backup.php`, `database/migrations/0001_01_01_000000_create_backups_table.php`, `database/factories/BackupFactory.php`. Conventions: ULID primary key (`HasUlids` + `$table->ulid('id')->primary()`), a nullable `data` json column for metadata, and a `newFactory()` override (package factory namespaces aren't auto-discovered). Migrations are auto-loaded — host apps pick them up with plain `php artisan migrate`.
-
-### Add an artisan command
-
-Copy `src/Commands/BackupCommand.php`, then register the class in the `commands([...])` call in `BackupServiceProvider::boot()`. Prefix signatures with your package slug (`backup:example`).
-
-### Add a route
-
-Declare it in `routes/web.php` with a named route (`->name('backup.…')`). Routes load automatically in every host app, so keep them namespaced and prefixed — or delete the file and the `loadRoutesFrom` line if your package has none.
-
-### Add a Blade component
-
-Drop an anonymous component into `components/` — `components/card.blade.php` becomes `<x-backup::card>` in host apps (registered via `Blade::anonymousComponentPath`). `components/example.blade.php` shows the `@props` + `$attributes->merge` pattern.
-
-### Add views or translations
-
-Views go in `resources/views/` and render as `view('backup::name')`. For translations, create `lang/`, uncomment the `loadTranslationsFrom` line in the service provider, and use `__('backup::file.key')`.
-
-### Add to the public API
-
-Add methods to `src/Backup.php` — the singleton behind `app('backup')` and the autoloaded `backup()` helper. This is the package's front door; keep cross-cutting operations here rather than scattering static helpers.
-
-### Add an enum
-
-Mix `Jiannius\Backup\Traits\Enum` into a backed enum with `FULL_UPPERCASE` cases — you get `all()`, `option()`, `label()`, `get()`, `is()`/`isNot()` (see `tests/Unit/EnumTest.php` for the full surface).
-
-### Add a test
-
-Create a file under `tests/Feature` or `tests/Unit` — Pest binds `Tests\TestCase` automatically, no class boilerplate needed:
-
-```php
-it('does the thing', function () {
-    expect(backup()->config('name'))->toBe('Backup');
-});
-```
-
-## Using your package in a host app
-
-Until it's on Packagist, require it via a VCS or path repository:
+Until the package is on Packagist, require it via a VCS repository:
 
 ```json
 {
     "repositories": [
-        { "type": "vcs", "url": "https://github.com/jiannius/<your-package>" }
+        { "type": "vcs", "url": "https://github.com/jiannius/backup" }
     ],
     "require": {
-        "jiannius/<your-package>": "dev-main"
+        "jiannius/backup": "dev-main"
     }
 }
 ```
 
-The service provider auto-registers (`extra.laravel.providers`), migrations run with `php artisan migrate`, config publishes with `php artisan vendor:publish --tag=backup-config`, and components/views/routes are immediately available. To pull the package's AI guidelines into the app's `CLAUDE.md`, add the package name to the app's `boost.json` `"packages"` array and re-run `php artisan boost:install`.
+The service provider auto-registers. Publish the config if you want to override it:
 
-## What's inside
+```bash
+php artisan vendor:publish --tag=backup-config
+```
 
-| Path | Purpose |
-| --- | --- |
-| `src/BackupServiceProvider.php` | Wires routes, migrations, views, components, command, config |
-| `src/Backup.php` | Singleton entry-point — `app('backup')` / `backup()` |
-| `src/Helpers.php` | Autoloaded `backup()` helper |
-| `src/Traits/Enum.php` | `FULL_UPPERCASE` backed-enum trait |
-| `src/Models/Backup.php` | ULID example model with a `data` json column |
-| `src/Commands/BackupCommand.php` | Example artisan command (`backup:example`) |
-| `config/backup.php` | Publishable config (tag `backup-config`) |
-| `routes/web.php` | Example route (`GET /backup`) |
-| `components/example.blade.php` | Anonymous Blade component (`<x-backup::example>`) |
-| `resources/boost/guidelines/core.blade.php` | Consumer-facing Boost guidelines |
-| `.ai/guidelines/backup.blade.php` | Package-dev guidelines (Boost-merge source for `CLAUDE.md`) |
-| `.mcp.json` / `.cursor/mcp.json` / `boost.json` | Laravel Boost wiring (via Testbench) |
-| `testbench.yaml` | Registers the provider into the Testbench app |
-| `tests/` | Pest 4 + Testbench suite |
-| `configure.php` | One-shot rename script (deletes itself) |
+## Configuration
+
+The quick knobs are env vars:
+
+| Env | Default | Purpose |
+| --- | --- | --- |
+| `BACKUP_DISK` | `local` | Destination disk (any disk in `config/filesystems.php`) |
+| `BACKUP_PATH` | `backups` | Folder on that disk |
+| `BACKUP_RETENTION_DAYS` | `30` | Archives older than this are pruned after each run |
+| `BACKUP_NOTIFICATION_EMAIL` | — | Failure email recipient (unset = log only) |
+
+Folders and database options live in `config/backup.php`:
+
+```php
+'database' => [
+    'connection' => null,           // null = the app's default connection
+    'binary_path' => null,          // dir containing mysqldump/pg_dump/sqlite3, null = PATH
+],
+
+'files' => [
+    'include' => [
+        storage_path('app/public'), // absolute folder paths to back up
+    ],
+    'exclude' => [
+        '*.log',                    // glob patterns, matched relative to each folder
+        'cache/*',
+    ],
+],
+```
+
+With no folders configured, runs produce a database-only archive — that's the zero-config default.
+
+## Usage
+
+```bash
+php artisan backup:run               # database + files
+php artisan backup:run --only-db     # database only
+php artisan backup:run --only-files  # files only
+```
+
+Schedule it in `routes/console.php`:
+
+```php
+Schedule::command('backup:run')->daily();
+```
+
+Or run it programmatically — returns the uploaded archive filename, throws on failure:
+
+```php
+$filename = backup()->run();                  // full backup
+$filename = backup()->run(database: false);   // files only
+```
+
+Exit codes: `0` success · `1` backup failed (already logged/emailed) · `2` invalid flag combination.
+
+## Failure notifications
+
+When a run fails for any reason — dump error, missing folder, upload rejected — the error is logged and a markdown email is sent to `BACKUP_NOTIFICATION_EMAIL` (if set), then the exception is rethrown. A broken mailer never masks the original failure.
+
+## Development
+
+This is a package, so there is no `artisan` — [Orchestra Testbench](https://github.com/orchestral/testbench) is the artisan:
+
+```bash
+composer install
+composer test                              # Pest 4 + Testbench suite
+composer lint                              # Pint
+vendor/bin/testbench backup:run --only-db  # run the command in the throwaway app
+```
+
+End-to-end dump tests require the `sqlite3` binary and skip cleanly when it's absent. See `CLAUDE.md` for the package conventions and `docs/superpowers/specs/` for the design doc.
 
 ## License
 
