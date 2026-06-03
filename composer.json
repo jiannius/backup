@@ -12,7 +12,8 @@
     ],
     "require": {
         "php": "^8.3",
-        "illuminate/support": "^13.0"
+        "illuminate/support": "^13.0",
+        "spatie/db-dumper": "^4.1"
     },
     "require-dev": {
         "laravel/boost": "^2.0",
@@ -23,8 +24,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Jiannius\\Backup\\": "src/",
-            "Jiannius\\Backup\\Database\\Factories\\": "database/factories/"
+            "Jiannius\\Backup\\": "src/"
         },
         "files": [
             "src/Helpers.php"

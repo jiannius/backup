@@ -1,15 +1,29 @@
 ## Backup
 
-`jiannius/backup` is a Laravel package. Its service provider auto-registers and loads routes, migrations, views (`backup::*`), and anonymous Blade components (`<x-backup::*>`) into this app.
+`jiannius/backup` is a Laravel package providing scheduled database + files backup. Its service provider auto-registers and loads views (`backup::*`) into this app.
+
+### The `backup:run` command
+
+Backs up the database (sqlite, mysql, pgsql — via spatie/db-dumper) and the configured folders into a single timestamped zip, uploads it to the backup disk, prunes archives older than the retention period, and emails the configured address on failure.
+
+@verbatim
+<code-snippet name="Run and schedule backups" lang="php">
+// routes/console.php
+Schedule::command('backup:run')->daily();
+
+// partial runs
+// php artisan backup:run --only-db
+// php artisan backup:run --only-files
+</code-snippet>
+@endverbatim
 
 ### Public API — the `backup()` helper
 
-The package exposes a single entry-point resolvable via the `backup()` helper or `app('backup')`:
-
 @verbatim
 <code-snippet name="Using the backup singleton" lang="php">
+backup()->run();                  // run a backup programmatically, returns the archive filename
 backup()->version();              // package version
-backup()->config('name');         // read config('backup.name')
+backup()->config('disk');         // read config('backup.disk')
 </code-snippet>
 @endverbatim
 
@@ -23,7 +37,7 @@ php artisan vendor:publish --tag=backup-config
 </code-snippet>
 @endverbatim
 
-Values live under `config('backup.*')`.
+Key values (all under `config('backup.*')`): `disk` + `path` (destination), `database.connection` (null = default), `files.include` + `files.exclude` (folder paths and exclude globs), `retention.days`, `notifications.email` (failure email, null = off). The dump binaries (`mysqldump`, `pg_dump`, `sqlite3`) must be installed on the server; set `database.binary_path` when they are not in PATH.
 
 ### Enums
 
@@ -47,7 +61,3 @@ enum Status: string
 Status::all()->map->option()->all();   // select options
 </code-snippet>
 @endverbatim
-
-### Components
-
-Use `<x-backup::example title="..." />` for the package's anonymous Blade components. Check `vendor/jiannius/backup/components/` for the full set before writing custom markup.

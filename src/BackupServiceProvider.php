@@ -2,7 +2,6 @@
 
 namespace Jiannius\Backup;
 
-use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\ServiceProvider;
 use Jiannius\Backup\Commands\BackupCommand;
 
@@ -27,20 +26,8 @@ class BackupServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        // Routes — the host app can override by re-declaring the named route.
-        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
-
-        // Migrations — picked up by the host app's `php artisan migrate`.
-        $this->loadMigrationsFrom(__DIR__.'/../database/migrations');
-
-        // Views — referenced as view('backup::...').
+        // Views — referenced as view('backup::...'), used by the failure mailable.
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'backup');
-
-        // Anonymous Blade components — usable as <x-backup::name />.
-        Blade::anonymousComponentPath(__DIR__.'/../components', 'backup');
-
-        // Translations — uncomment once a lang/ directory is added.
-        // $this->loadTranslationsFrom(__DIR__.'/../lang', 'backup');
 
         if ($this->app->runningInConsole()) {
             // Let the host app publish + override the config file.

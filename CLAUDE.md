@@ -15,7 +15,7 @@ Main stack — abide by these versions: php 8.4 (constraint `^8.3`) · laravel/f
 ```bash
 composer install                                   # install dependencies
 composer test                                      # Pest 4 + Testbench suite
-vendor/bin/pest tests/Feature/RouteTest.php        # single test file
+vendor/bin/pest tests/Feature/CommandTest.php      # single test file
 vendor/bin/pest --filter='binds the backup singleton'  # single test
 composer lint                                      # vendor/bin/pint
 vendor/bin/testbench boost:mcp                     # start the Boost MCP server (used by editors)
@@ -45,11 +45,11 @@ Laravel Boost is installed (dev) and runs through Testbench. Editors connect via
 
 ### Service-provider wiring (`src/BackupServiceProvider.php`)
 
-`register()` merges `config/backup.php` and binds the `Backup` singleton (aliased `app('backup')`). `boot()` loads `routes/web.php`, `database/migrations/`, `resources/views/` (view namespace `backup`), and the anonymous Blade components in `components/` (`<x-backup::name>`). Console-only: publishes the config (tag `backup-config`) and registers `backup:example`. Read this file first when something seems to come from nowhere.
+`register()` merges `config/backup.php` and binds the `Backup` singleton (aliased `app('backup')`). `boot()` loads `resources/views/` (view namespace `backup`, used by the failure mailable). Console-only: publishes the config (tag `backup-config`) and registers `backup:run`. Read this file first when something seems to come from nowhere.
 
 ### Singleton entry-point (`src/Backup.php` → `app('backup')` / `backup()`)
 
-The package's public API object, resolvable via the container alias `backup` or the autoloaded `backup()` helper (`src/Helpers.php`). Add cross-cutting package methods here.
+The package's public API object, resolvable via the container alias `backup` or the autoloaded `backup()` helper (`src/Helpers.php`). `run(bool $database = true, bool $files = true): string` performs dump → zip → upload → prune and returns the archive filename; collaborator services live in `src/Services/` (`DatabaseDumper`, `Archiver`, `Pruner`). Add cross-cutting package methods here.
 
 ## Development guidelines
 

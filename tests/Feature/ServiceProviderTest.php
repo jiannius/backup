@@ -13,5 +13,10 @@ it('exposes the backup() helper returning the singleton', function () {
 });
 
 it('merges the package config so config(backup.*) is available', function () {
-    expect(config('backup.name'))->toBe('Backup');
+    expect(config('backup.disk'))->toBe('local');
+    expect(config('backup.path'))->toBe('backups');
+    expect(config('backup.database.connection'))->toBeNull();
+    expect(config('backup.files.include'))->toBe([]);
+    expect(config('backup.retention.days'))->toBe(30);
+    expect(config('backup.notifications.email'))->toBeNull();
 });
