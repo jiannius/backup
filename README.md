@@ -27,17 +27,8 @@ Every failure is logged, and emailed if a notification address is configured. Th
 
 ## Installation
 
-The repository is private (not on Packagist), so require it via a VCS repository — your Composer needs read access to the repo (an SSH key or a GitHub token):
-
-```json
-{
-    "repositories": [
-        { "type": "vcs", "url": "https://github.com/jiannius/backup" }
-    ],
-    "require": {
-        "jiannius/backup": "^0.2"
-    }
-}
+```bash
+composer require jiannius/backup
 ```
 
 The service provider auto-registers. Publish the config if you want to override it:
