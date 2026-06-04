@@ -27,7 +27,7 @@ Every failure is logged, and emailed if a notification address is configured. Th
 
 ## Installation
 
-Until the package is on Packagist, require it via a VCS repository:
+The repository is private (not on Packagist), so require it via a VCS repository — your Composer needs read access to the repo (an SSH key or a GitHub token):
 
 ```json
 {
@@ -35,7 +35,7 @@ Until the package is on Packagist, require it via a VCS repository:
         { "type": "vcs", "url": "https://github.com/jiannius/backup" }
     ],
     "require": {
-        "jiannius/backup": "dev-main"
+        "jiannius/backup": "^0.2"
     }
 }
 ```
