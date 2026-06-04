@@ -24,8 +24,8 @@ class Backup
      */
     public function version(): string
     {
-        // Keep in sync with the version in composer.json.
-        return '0.1.0';
+        // Keep in sync with the git release tag.
+        return '0.2.0';
     }
 
     /**
