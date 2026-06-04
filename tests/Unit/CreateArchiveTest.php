@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\File;
-use Jiannius\Backup\Services\Archiver;
+use Jiannius\Backup\Actions\CreateArchive;
 
 beforeEach(function () {
     $this->temp = sys_get_temp_dir().'/archiver-test-'.uniqid();
@@ -21,7 +21,7 @@ it('zips the dump at the root and folder contents under files/', function () {
     $zipPath = $this->temp.'/backup.zip';
     $source = $this->temp.'/source';
 
-    (new Archiver)->create($zipPath, $this->temp.'/db.sql', [$source]);
+    (new CreateArchive)->handle($zipPath, $this->temp.'/db.sql', [$source]);
 
     $zip = new ZipArchive;
     $zip->open($zipPath);
@@ -37,7 +37,7 @@ it('honors exclude glob patterns against folder-relative paths', function () {
     $zipPath = $this->temp.'/backup.zip';
     $source = $this->temp.'/source';
 
-    (new Archiver)->create($zipPath, $this->temp.'/db.sql', [$source], ['*.log', 'cache/*']);
+    (new CreateArchive)->handle($zipPath, $this->temp.'/db.sql', [$source], ['*.log', 'cache/*']);
 
     $zip = new ZipArchive;
     $zip->open($zipPath);
@@ -52,7 +52,7 @@ it('creates a files-only archive when no dump is given', function () {
     $zipPath = $this->temp.'/backup.zip';
     $source = $this->temp.'/source';
 
-    (new Archiver)->create($zipPath, null, [$source]);
+    (new CreateArchive)->handle($zipPath, null, [$source]);
 
     $zip = new ZipArchive;
     $zip->open($zipPath);
@@ -63,6 +63,6 @@ it('creates a files-only archive when no dump is given', function () {
 });
 
 it('throws when an included folder does not exist', function () {
-    expect(fn () => (new Archiver)->create($this->temp.'/backup.zip', null, [$this->temp.'/missing']))
+    expect(fn () => (new CreateArchive)->handle($this->temp.'/backup.zip', null, [$this->temp.'/missing']))
         ->toThrow(RuntimeException::class, 'does not exist');
 });

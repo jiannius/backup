@@ -4,6 +4,7 @@ namespace Jiannius\Backup;
 
 use Illuminate\Support\ServiceProvider;
 use Jiannius\Backup\Commands\BackupCommand;
+use Jiannius\Backup\Commands\BackupListCommand;
 
 class BackupServiceProvider extends ServiceProvider
 {
@@ -38,6 +39,7 @@ class BackupServiceProvider extends ServiceProvider
             // Register the package's artisan commands.
             $this->commands([
                 BackupCommand::class,
+                BackupListCommand::class,
             ]);
         }
     }

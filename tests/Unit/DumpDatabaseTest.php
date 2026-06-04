@@ -1,6 +1,6 @@
 <?php
 
-use Jiannius\Backup\Services\DatabaseDumper;
+use Jiannius\Backup\Actions\DumpDatabase;
 use Spatie\DbDumper\Databases\MariaDb;
 use Spatie\DbDumper\Databases\MySql;
 use Spatie\DbDumper\Databases\PostgreSql;
@@ -12,7 +12,7 @@ it('maps sqlite connections to the sqlite dumper', function () {
         'database' => '/tmp/db.sqlite',
     ]);
 
-    $dumper = (new DatabaseDumper)->dumper('source');
+    $dumper = (new DumpDatabase)->dumper('source');
 
     expect($dumper)->toBeInstanceOf(Sqlite::class);
     expect($dumper->getDbName())->toBe('/tmp/db.sqlite');
@@ -28,7 +28,7 @@ it('maps mysql connections to the mysql dumper', function () {
         'password' => 'secret',
     ]);
 
-    $dumper = (new DatabaseDumper)->dumper('source');
+    $dumper = (new DumpDatabase)->dumper('source');
 
     expect($dumper)->toBeInstanceOf(MySql::class);
     expect($dumper)->not->toBeInstanceOf(MariaDb::class);
@@ -48,7 +48,7 @@ it('maps mariadb connections to the mariadb dumper', function () {
         'password' => 'secret',
     ]);
 
-    $dumper = (new DatabaseDumper)->dumper('source');
+    $dumper = (new DumpDatabase)->dumper('source');
 
     expect($dumper)->toBeInstanceOf(MariaDb::class);
     expect($dumper->getDbName())->toBe('app');
@@ -65,7 +65,7 @@ it('maps pgsql connections to the postgres dumper', function () {
         'password' => 'secret',
     ]);
 
-    $dumper = (new DatabaseDumper)->dumper('source');
+    $dumper = (new DumpDatabase)->dumper('source');
 
     expect($dumper)->toBeInstanceOf(PostgreSql::class);
     expect($dumper->getDbName())->toBe('app');
@@ -74,7 +74,7 @@ it('maps pgsql connections to the postgres dumper', function () {
 
 it('uses the default connection when none is configured', function () {
     // The Testbench default connection ("testing") is in-memory sqlite.
-    $dumper = (new DatabaseDumper)->dumper();
+    $dumper = (new DumpDatabase)->dumper();
 
     expect($dumper)->toBeInstanceOf(Sqlite::class);
     expect($dumper->getDbName())->toBe(':memory:');
@@ -87,7 +87,7 @@ it('applies the configured dump binary path', function () {
     ]);
     config()->set('backup.database.binary_path', '/usr/local/bin/');
 
-    $dumper = (new DatabaseDumper)->dumper('source');
+    $dumper = (new DumpDatabase)->dumper('source');
 
     expect($dumper->getDumpCommand('/tmp/out.sql'))->toContain('/usr/local/bin/sqlite3');
 });
@@ -98,12 +98,12 @@ it('throws for unsupported database drivers', function () {
         'database' => 'app',
     ]);
 
-    expect(fn () => (new DatabaseDumper)->dumper('source'))
+    expect(fn () => (new DumpDatabase)->dumper('source'))
         ->toThrow(RuntimeException::class, 'Unsupported database driver [sqlsrv]');
 });
 
 it('throws for unknown connections', function () {
-    expect(fn () => (new DatabaseDumper)->dumper('nope'))
+    expect(fn () => (new DumpDatabase)->dumper('nope'))
         ->toThrow(RuntimeException::class, 'Database connection [nope] is not configured');
 });
 
@@ -114,6 +114,6 @@ it('throws when a credentialed connection has no username', function () {
         'database' => 'app',
     ]);
 
-    expect(fn () => (new DatabaseDumper)->dumper('source'))
+    expect(fn () => (new DumpDatabase)->dumper('source'))
         ->toThrow(RuntimeException::class, 'requires a username for backup');
 });

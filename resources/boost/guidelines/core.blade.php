@@ -17,11 +17,23 @@ Schedule::command('backup:run')->daily();
 </code-snippet>
 @endverbatim
 
+### The `backup:list` command
+
+Lists this app's archives already on the backup disk (newest first), with a temporary download URL per archive when the disk driver supports it (e.g. S3; plain `local` disks list with a `null` URL). Reads the disk — there is no database tracking.
+
+@verbatim
+<code-snippet name="List backups" lang="bash">
+php artisan backup:list          # Date / Filename / Size table
+php artisan backup:list --url    # also print a temporary download URL column
+</code-snippet>
+@endverbatim
+
 ### Public API — the `backup()` helper
 
 @verbatim
 <code-snippet name="Using the backup singleton" lang="php">
 backup()->run();                  // run a backup programmatically, returns the archive filename
+backup()->list();                 // Collection of archives: ['filename','path','size','date','url'], newest first
 backup()->version();              // package version
 backup()->config('disk');         // read config('backup.disk')
 </code-snippet>
@@ -37,7 +49,7 @@ php artisan vendor:publish --tag=backup-config
 </code-snippet>
 @endverbatim
 
-Key values (all under `config('backup.*')`): `disk` + `path` (destination), `database.connection` (null = default), `files.include` + `files.exclude` (folder paths and exclude globs), `retention.days`, `notifications.email` (failure email, null = off). The dump binaries (`mysqldump`, `pg_dump`, `sqlite3`) must be installed on the server; set `database.binary_path` when they are not in PATH.
+Key values (all under `config('backup.*')`): `disk` + `path` (destination), `database.connection` (null = default), `files.include` + `files.exclude` (folder paths and exclude globs), `retention.days`, `notifications.email` (failure email, null = off), `download.expiry` (download-link lifetime in minutes, default 1440). The dump binaries (`mysqldump`, `pg_dump`, `sqlite3`) must be installed on the server; set `database.binary_path` when they are not in PATH.
 
 ### Enums
 

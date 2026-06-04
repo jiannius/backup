@@ -49,7 +49,7 @@ Laravel Boost is installed (dev) and runs through Testbench. Editors connect via
 
 ### Singleton entry-point (`src/Backup.php` → `app('backup')` / `backup()`)
 
-The package's public API object, resolvable via the container alias `backup` or the autoloaded `backup()` helper (`src/Helpers.php`). `run(bool $database = true, bool $files = true): string` performs dump → zip → upload → prune and returns the archive filename; collaborator services live in `src/Services/` (`DatabaseDumper`, `Archiver`, `Pruner`). Add cross-cutting package methods here.
+The package's public API object, resolvable via the container alias `backup` or the autoloaded `backup()` helper (`src/Helpers.php`). `run(bool $database = true, bool $files = true): string` performs dump → zip → upload → prune and returns the archive filename; `list(?int $expiry = null): Collection` returns this app's disk archives (newest first) with temporary download URLs. Collaborator actions live in `src/Actions/` (`DumpDatabase`, `CreateArchive`, `PruneBackups`, `ListBackups`), each a single-purpose class with a `handle()` entry method. Add cross-cutting package methods here.
 
 ## Development guidelines
 

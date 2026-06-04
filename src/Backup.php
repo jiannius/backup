@@ -3,14 +3,17 @@
 namespace Jiannius\Backup;
 
 use Illuminate\Http\File as HttpFile;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Jiannius\Backup\Actions\CreateArchive;
+use Jiannius\Backup\Actions\DumpDatabase;
+use Jiannius\Backup\Actions\ListBackups;
+use Jiannius\Backup\Actions\PruneBackups;
 use Jiannius\Backup\Mail\BackupFailed;
-use Jiannius\Backup\Services\Archiver;
-use Jiannius\Backup\Services\DatabaseDumper;
-use Jiannius\Backup\Services\Pruner;
 use RuntimeException;
 use Throwable;
 
@@ -52,6 +55,22 @@ class Backup
     }
 
     /**
+     * List this app's backup archives on the disk, newest first, each with a
+     * temporary download URL (null when the disk driver can't produce one).
+     *
+     * @param  int|null  $expiry  download-link lifetime in minutes (null = config default)
+     * @return Collection<int, array{filename: string, path: string, size: int, date: Carbon, url: ?string}>
+     */
+    public function list(?int $expiry = null): Collection
+    {
+        return app(ListBackups::class)->handle(
+            $this->config('disk'),
+            $this->config('path'),
+            $expiry ?? (int) $this->config('download.expiry', 1440),
+        );
+    }
+
+    /**
      * The backup pipeline: dump → zip → upload → prune.
      */
     protected function execute(bool $database, bool $files): string
@@ -70,13 +89,13 @@ class Backup
 
             if ($database) {
                 $dump = $temp.'/db.sql';
-                app(DatabaseDumper::class)->dump($this->config('database.connection'), $dump);
+                app(DumpDatabase::class)->handle($this->config('database.connection'), $dump);
             }
 
             $filename = Str::slug(config('app.name')).'-'.now()->format('Y-m-d-His').'.zip';
             $zip = $temp.'/'.$filename;
 
-            app(Archiver::class)->create($zip, $dump, $include, $this->config('files.exclude', []));
+            app(CreateArchive::class)->handle($zip, $dump, $include, $this->config('files.exclude', []));
 
             $stored = Storage::disk($this->config('disk'))
                 ->putFileAs($this->config('path'), new HttpFile($zip), $filename);
@@ -85,7 +104,7 @@ class Backup
                 throw new RuntimeException("Failed to upload backup archive to disk [{$this->config('disk')}].");
             }
 
-            app(Pruner::class)->prune($this->config('disk'), $this->config('path'), (int) $this->config('retention.days'));
+            app(PruneBackups::class)->handle($this->config('disk'), $this->config('path'), (int) $this->config('retention.days'));
 
             return $filename;
         } finally {

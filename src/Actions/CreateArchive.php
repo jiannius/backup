@@ -1,13 +1,13 @@
 <?php
 
-namespace Jiannius\Backup\Services;
+namespace Jiannius\Backup\Actions;
 
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
 use ZipArchive;
 
-class Archiver
+class CreateArchive
 {
     /**
      * Create a zip archive containing the database dump and the given folders.
@@ -15,7 +15,7 @@ class Archiver
      * @param  list<string>  $folders  absolute folder paths to include
      * @param  list<string>  $excludes  glob patterns matched against paths relative to each folder
      */
-    public function create(string $zipPath, ?string $dumpPath, array $folders, array $excludes = []): void
+    public function handle(string $zipPath, ?string $dumpPath, array $folders, array $excludes = []): void
     {
         $zip = new ZipArchive;
 

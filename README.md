@@ -56,6 +56,7 @@ The quick knobs are env vars:
 | `BACKUP_PATH` | `backups` | Folder on that disk |
 | `BACKUP_RETENTION_DAYS` | `30` | Archives older than this are pruned after each run |
 | `BACKUP_NOTIFICATION_EMAIL` | — | Failure email recipient (unset = log only) |
+| `BACKUP_DOWNLOAD_EXPIRY` | `1440` | Download-link lifetime in minutes (24h) for `backup:list --url` / `backup()->list()` |
 
 Folders and database options live in `config/backup.php`:
 
@@ -97,6 +98,20 @@ Or run it programmatically — returns the uploaded archive filename, throws on 
 ```php
 $filename = backup()->run();                  // full backup
 $filename = backup()->run(database: false);   // files only
+```
+
+List the archives already on the disk — each with a temporary download URL when the disk driver supports it (e.g. S3; local disks list with a `null` URL):
+
+```bash
+php artisan backup:list          # Date / Filename / Size table
+php artisan backup:list --url    # also print a temporary download URL column
+```
+
+Or programmatically — returns a `Collection` of `['filename', 'path', 'size', 'date', 'url']`, newest first:
+
+```php
+backup()->list();      // download URLs use the configured expiry (default 24h)
+backup()->list(60);    // override: URLs valid for 60 minutes
 ```
 
 Exit codes: `0` success · `1` backup failed (already logged/emailed) · `2` invalid flag combination.

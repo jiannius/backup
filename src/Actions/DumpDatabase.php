@@ -1,6 +1,6 @@
 <?php
 
-namespace Jiannius\Backup\Services;
+namespace Jiannius\Backup\Actions;
 
 use RuntimeException;
 use Spatie\DbDumper\Databases\MariaDb;
@@ -9,12 +9,12 @@ use Spatie\DbDumper\Databases\PostgreSql;
 use Spatie\DbDumper\Databases\Sqlite;
 use Spatie\DbDumper\DbDumper;
 
-class DatabaseDumper
+class DumpDatabase
 {
     /**
      * Dump the given Laravel connection to a file.
      */
-    public function dump(?string $connection, string $path): void
+    public function handle(?string $connection, string $path): void
     {
         $this->dumper($connection)->dumpToFile($path);
     }

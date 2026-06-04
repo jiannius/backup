@@ -1,16 +1,16 @@
 <?php
 
-namespace Jiannius\Backup\Services;
+namespace Jiannius\Backup\Actions;
 
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
-class Pruner
+class PruneBackups
 {
     /**
      * Delete this app's backup archives older than the retention period.
      */
-    public function prune(string $disk, string $path, int $days): void
+    public function handle(string $disk, string $path, int $days): void
     {
         $storage = Storage::disk($disk);
         $cutoff = now()->subDays($days)->getTimestamp();

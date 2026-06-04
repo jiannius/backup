@@ -1,7 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Storage;
-use Jiannius\Backup\Services\Pruner;
+use Jiannius\Backup\Actions\PruneBackups;
 
 it('deletes only this app\'s archives older than the retention period', function () {
     Storage::fake('local');
@@ -18,7 +18,7 @@ it('deletes only this app\'s archives older than the retention period', function
     touch($disk->path('backups/other-2026-01-01-000000.zip'), $stale);
     touch($disk->path('backups/laravel-notes.txt'), $stale);
 
-    (new Pruner)->prune('local', 'backups', 30);
+    (new PruneBackups)->handle('local', 'backups', 30);
 
     expect($disk->exists('backups/laravel-2026-01-01-000000.zip'))->toBeFalse();
     expect($disk->exists('backups/laravel-2026-06-01-000000.zip'))->toBeTrue();
