@@ -23,3 +23,18 @@ it('ships a renderable consumer-facing boost guideline', function () {
 
     expect($rendered)->toContain('Backup')->toContain('backup()');
 });
+
+it('documents the ui hooks in the consumer-facing guideline', function () {
+    $prepared = str_replace(
+        ['`', '<?php', '</x-', '<x-'],
+        ['__BT__', '__PHP__', '__XC__', '__XO__'],
+        (string) file_get_contents(__DIR__.'/../../resources/boost/guidelines/core.blade.php'),
+    );
+
+    $rendered = Blade::render($prepared);
+
+    expect($rendered)
+        ->toContain('beforeRunning')
+        ->toContain('beforeDownloading')
+        ->toContain('BACKUP_UI_ENABLED');
+});

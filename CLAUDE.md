@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Because a package has no `artisan` binary, all dev/test/AI tooling runs through **Orchestra Testbench**: `vendor/bin/testbench` is the artisan equivalent, booting a throwaway Laravel 13 app (configured by `testbench.yaml`) with `BackupServiceProvider` registered.
 
-Main stack — abide by these versions: php 8.4 (constraint `^8.3`) · laravel/framework v13 (via Testbench) · orchestra/testbench v11 · pestphp/pest v4 · phpunit v12 · laravel/pint v1 · laravel/boost v2.
+Main stack — abide by these versions: php 8.4 (constraint `^8.3`) · laravel/framework v13 (via Testbench) · orchestra/testbench v11 · pestphp/pest v4 · phpunit v12 · laravel/pint v1 · laravel/boost v2 · jiannius/atom v3 (UI, brings livewire v4).
 
 ## Common commands
 
@@ -45,11 +45,22 @@ Laravel Boost is installed (dev) and runs through Testbench. Editors connect via
 
 ### Service-provider wiring (`src/BackupServiceProvider.php`)
 
-`register()` merges `config/backup.php` and binds the `Backup` singleton (aliased `app('backup')`). `boot()` loads `resources/views/` (view namespace `backup`, used by the failure mailable). Console-only: publishes the config (tag `backup-config`) and registers `backup:run`. Read this file first when something seems to come from nowhere.
+`register()` merges `config/backup.php` and binds the `Backup` singleton (aliased `app('backup')`). `boot()` loads `resources/views/` (view namespace `backup`, used by the failure mailable and the UI page). When `backup.ui.enabled` is on it also loads `routes/web.php`, registers the Livewire components and adds the `Authorize` middleware as Livewire persistent middleware. Console-only: publishes the config (tag `backup-config`) and registers `backup:run`. Read this file first when something seems to come from nowhere.
 
 ### Singleton entry-point (`src/Backup.php` → `app('backup')` / `backup()`)
 
-The package's public API object, resolvable via the container alias `backup` or the autoloaded `backup()` helper (`src/Helpers.php`). `run(bool $database = true, bool $files = true): string` performs dump → zip → upload → prune and returns the archive filename; `list(?int $expiry = null): Collection` returns this app's disk archives (newest first) with temporary download URLs. Collaborator actions live in `src/Actions/` (`DumpDatabase`, `CreateArchive`, `PruneBackups`, `ListBackups`), each a single-purpose class with a `handle()` entry method. Add cross-cutting package methods here.
+The package's public API object, resolvable via the container alias `backup` or the autoloaded `backup()` helper (`src/Helpers.php`). `run(bool $database = true, bool $files = true): string` performs dump → zip → upload → prune and returns the archive filename; `list(?int $expiry = null, bool $withUrls = true): Collection` returns this app's disk archives (newest first) with temporary download URLs (`withUrls: false` skips signing them). Collaborator actions live in `src/Actions/` (`DumpDatabase`, `CreateArchive`, `PruneBackups`, `ListBackups`, `ArchiveFilename`, `BackupRunStatus`), each a single-purpose class (most expose a `handle()` entry method; `ArchiveFilename` has `make()`/`matches()`, `BackupRunStatus` its run-lifecycle methods). Add cross-cutting package methods here.
+
+It also holds the **consumer hooks**: `auth()` (UI access; default = `local` env only, all registered callbacks must allow), `beforeRunning()` and `beforeDownloading()`. They are stored per name and fired with `callHooks()`; `authorize(Request)` evaluates the auth hooks. `run(..., bool $runHooks = true)` fires `beforeRunning` first (a hook that throws or aborts blocks the run before the pipeline starts, and is logged and emailed like any other failure so unattended runs leave a trace; the UI calls the hooks itself with `runHooks: false`, so a blocked UI run gets no email); the queued job passes `runHooks: false` because the hooks already ran at request time.
+
+### Built-in UI (opt-in, `backup.ui.*`)
+
+The package is standalone: no permission/audit packages — access and audit are purely consumer hooks. UI is built with `jiannius/atom` (Livewire 4), database-only.
+
+- `routes/web.php` (only when enabled): `backup.ui.index` → `Livewire\Backups` (full page), `backup.ui.download` (`POST download/{filename}`, `[A-Za-z0-9._-]+\.zip`) → `Http\Controllers\BackupDownloadController` (looks the file up through `backup()->list(ui.download_expiry)` → 404 otherwise, runs `beforeDownloading`, redirects to a fresh temporary URL or streams on disks without one). The group middleware is `ui.middleware` plus `Http\Middleware\Authorize` (always appended; it answers 404 when `ui.enabled` is false, then 403 per the auth hooks, and also guards Livewire update requests). An empty `ui.path` falls back to `backups`.
+- Archives are matched by `Actions\ArchiveFilename` — exactly `{app-slug}-Y-m-d-His.zip` — so listing, download and pruning never touch another app's archives (`acme` vs `acme-staging`).
+- `Livewire\Backups` + `resources/views/livewire/backups.blade.php` (`<atom:*>` markup): re-checks `backup()->authorize()` on mount and in `run()`/`pollStatus()`. It owns the status banner, the run button and the poll (`wire:poll.3s="pollStatus"`, only while a run is active). The archive table is a child component, `Livewire\BackupArchives` (`livewire/archives.blade.php`), so the poll never re-renders or re-lists it; `pollStatus()`/`run()` dispatch `backup-run-finished` once no run is active and the child reloads. The table lists with `withUrls: false` and never renders temporary URLs (each row is a native POST form with `@csrf`).
+- `run()` takes the lock (`BackupRunStatus::acquire()` returns a run id, or null → "A backup is already running."), fires `beforeRunning` at request time, records `queued`, dispatches `Jobs\RunBackup($runId)` (`tries = 1`, `timeout` from config, `failed()` records the error). Status + single-run lock live in the cache via `Actions\BackupRunStatus` (one key per app slug; no migrations). The lock value is the run id: `running/completed/failed/release` act only for the run that owns it, so a stale job can't release or overwrite a newer run; `running()` refreshes the lock to timeout + 60s (the queued phase has its own 1h TTL). The stored error is the first line, truncated to 200 chars; completed status is kept 1h, failed 24h. Tests pin `cache.default` to `array`.
 
 ## Development guidelines
 

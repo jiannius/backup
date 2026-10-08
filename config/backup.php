@@ -89,4 +89,37 @@ return [
     'notifications' => [
         'email' => env('BACKUP_NOTIFICATION_EMAIL'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Built-in UI
+    |--------------------------------------------------------------------------
+    |
+    | An optional page (built with jiannius/atom on Livewire) to start a
+    | database backup, list the archives and download one. Disabled by default.
+    | Who may open it is decided by the hooks registered on backup()
+    | (backup()->auth()); the default allows the "local" environment only.
+    |
+    | "middleware" wraps the routes (the package always adds its own access
+    | check on top). "layout" is a Blade layout view name; null uses the host
+    | app's Livewire default layout. "download_expiry" is the lifetime in
+    | minutes of the temporary link a UI download redirects to (separate from
+    | download.expiry above). "queue" controls the job that runs a UI
+    | backup: connection/name fall back to the app defaults and "timeout" is
+    | in seconds (keep the queue's retry_after above it).
+    |
+    */
+
+    'ui' => [
+        'enabled' => (bool) env('BACKUP_UI_ENABLED', false),
+        'path' => env('BACKUP_UI_PATH', 'backups'),
+        'middleware' => ['web', 'auth'],
+        'layout' => null,
+        'download_expiry' => (int) env('BACKUP_UI_DOWNLOAD_EXPIRY', 5),
+        'queue' => [
+            'connection' => env('BACKUP_UI_QUEUE_CONNECTION'),
+            'name' => env('BACKUP_UI_QUEUE'),
+            'timeout' => (int) env('BACKUP_UI_TIMEOUT', 1800),
+        ],
+    ],
 ];

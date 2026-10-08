@@ -5,6 +5,10 @@ namespace Jiannius\Backup;
 use Illuminate\Support\ServiceProvider;
 use Jiannius\Backup\Commands\BackupCommand;
 use Jiannius\Backup\Commands\BackupListCommand;
+use Jiannius\Backup\Http\Middleware\Authorize;
+use Jiannius\Backup\Livewire\BackupArchives;
+use Jiannius\Backup\Livewire\Backups;
+use Livewire\Livewire;
 
 class BackupServiceProvider extends ServiceProvider
 {
@@ -30,6 +34,10 @@ class BackupServiceProvider extends ServiceProvider
         // Views — referenced as view('backup::...'), used by the failure mailable.
         $this->loadViewsFrom(__DIR__.'/../resources/views', 'backup');
 
+        if (config('backup.ui.enabled')) {
+            $this->bootUi();
+        }
+
         if ($this->app->runningInConsole()) {
             // Let the host app publish + override the config file.
             $this->publishes([
@@ -42,5 +50,19 @@ class BackupServiceProvider extends ServiceProvider
                 BackupListCommand::class,
             ]);
         }
+    }
+
+    /**
+     * Register the opt-in UI: routes, the Livewire page and its access check.
+     */
+    protected function bootUi(): void
+    {
+        $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
+
+        Livewire::component('backup-backups', Backups::class);
+        Livewire::component('backup-archives', BackupArchives::class);
+
+        // Livewire update requests bypass the page route, so re-apply the access check there.
+        Livewire::addPersistentMiddleware([Authorize::class]);
     }
 }

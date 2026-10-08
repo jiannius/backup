@@ -13,6 +13,7 @@
     "require": {
         "php": "^8.3",
         "illuminate/support": "^13.0",
+        "jiannius/atom": "^3",
         "spatie/db-dumper": "^4.1"
     },
     "require-dev": {

@@ -12,6 +12,7 @@ it('lists this app\'s archives newest first with metadata', function () {
     $disk->put('backups/laravel-2026-06-01-000000.zip', 'newer');
     $disk->put('backups/other-2026-01-01-000000.zip', 'unrelated');
     $disk->put('backups/laravel-notes.txt', 'unrelated');
+    $disk->put('backups/laravel-staging-2026-06-01-000000.zip', 'another app whose slug starts with ours');
 
     touch($disk->path('backups/laravel-2026-01-01-000000.zip'), now()->subDays(40)->getTimestamp());
     touch($disk->path('backups/laravel-2026-06-01-000000.zip'), now()->subDays(1)->getTimestamp());

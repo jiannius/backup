@@ -3,7 +3,6 @@
 namespace Jiannius\Backup\Actions;
 
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class PruneBackups
 {
@@ -14,10 +13,10 @@ class PruneBackups
     {
         $storage = Storage::disk($disk);
         $cutoff = now()->subDays($days)->getTimestamp();
-        $pattern = Str::slug(config('app.name')).'-*.zip';
+        $archiveFilename = app(ArchiveFilename::class);
 
         foreach ($storage->files($path) as $file) {
-            if (! fnmatch($pattern, basename($file))) {
+            if (! $archiveFilename->matches(basename($file))) {
                 continue;
             }
 

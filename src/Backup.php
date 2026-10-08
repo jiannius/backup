@@ -2,13 +2,16 @@
 
 namespace Jiannius\Backup;
 
+use Closure;
 use Illuminate\Http\File as HttpFile;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Jiannius\Backup\Actions\ArchiveFilename;
 use Jiannius\Backup\Actions\CreateArchive;
 use Jiannius\Backup\Actions\DumpDatabase;
 use Jiannius\Backup\Actions\ListBackups;
@@ -20,12 +23,23 @@ use Throwable;
 class Backup
 {
     /**
+     * The registered hook callbacks, keyed by hook name.
+     *
+     * @var array{auth: array<int, Closure>, running: array<int, Closure>, downloading: array<int, Closure>}
+     */
+    protected array $hooks = [
+        'auth' => [],
+        'running' => [],
+        'downloading' => [],
+    ];
+
+    /**
      * The package version.
      */
     public function version(): string
     {
         // Keep in sync with the git release tag.
-        return '0.2.0';
+        return '0.3.0';
     }
 
     /**
@@ -37,15 +51,93 @@ class Backup
     }
 
     /**
+     * Register a callback deciding who can reach the UI routes. It receives the
+     * request and returns a bool; with several registered, all must allow.
+     * With none registered, access is limited to the "local" environment.
+     *
+     * @param  Closure(Request): bool  $callback
+     */
+    public function auth(Closure $callback): static
+    {
+        $this->hooks['auth'][] = $callback;
+
+        return $this;
+    }
+
+    /**
+     * Register a callback run before every backup (UI, backup:run, scheduler or
+     * programmatic). It receives ['database' => bool, 'files' => bool]; throwing
+     * or aborting blocks the backup.
+     *
+     * @param  Closure(array{database: bool, files: bool}): mixed  $callback
+     */
+    public function beforeRunning(Closure $callback): static
+    {
+        $this->hooks['running'][] = $callback;
+
+        return $this;
+    }
+
+    /**
+     * Register a callback run before an archive download is handed out. It
+     * receives the archive filename; throwing or aborting blocks the download.
+     *
+     * @param  Closure(string): mixed  $callback
+     */
+    public function beforeDownloading(Closure $callback): static
+    {
+        $this->hooks['downloading'][] = $callback;
+
+        return $this;
+    }
+
+    /**
+     * Whether the request may reach the UI: every registered auth callback must
+     * allow it, or (none registered) the app must be running locally.
+     */
+    public function authorize(Request $request): bool
+    {
+        if (empty($this->hooks['auth'])) {
+            return app()->environment('local');
+        }
+
+        foreach ($this->hooks['auth'] as $callback) {
+            if (! $callback($request)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Run the callbacks registered for a hook ("running" or "downloading"), in
+     * registration order.
+     */
+    public function callHooks(string $hook, mixed ...$arguments): void
+    {
+        foreach ($this->hooks[$hook] ?? [] as $callback) {
+            $callback(...$arguments);
+        }
+    }
+
+    /**
      * Run a backup: dump the database, zip it with the configured folders,
      * upload the archive to the backup disk, then prune old archives.
-     * Every failure is notified (logged + emailed) before rethrowing.
+     * Every failure, including a beforeRunning hook that throws or aborts, is
+     * notified (logged + emailed) before rethrowing, so an unattended run
+     * (scheduler, cron) never fails silently.
      *
+     * @param  bool  $runHooks  fire the beforeRunning hooks (false when the caller already did)
      * @return string the uploaded archive filename
      */
-    public function run(bool $database = true, bool $files = true): string
+    public function run(bool $database = true, bool $files = true, bool $runHooks = true): string
     {
         try {
+            if ($runHooks) {
+                $this->callHooks('running', ['database' => $database, 'files' => $files]);
+            }
+
             return $this->execute($database, $files);
         } catch (Throwable $e) {
             $this->notifyFailure($e);
@@ -59,14 +151,16 @@ class Backup
      * temporary download URL (null when the disk driver can't produce one).
      *
      * @param  int|null  $expiry  download-link lifetime in minutes (null = config default)
+     * @param  bool  $withUrls  false skips building the URLs (every url is null)
      * @return Collection<int, array{filename: string, path: string, size: int, date: Carbon, url: ?string}>
      */
-    public function list(?int $expiry = null): Collection
+    public function list(?int $expiry = null, bool $withUrls = true): Collection
     {
         return app(ListBackups::class)->handle(
             $this->config('disk'),
             $this->config('path'),
             $expiry ?? (int) $this->config('download.expiry', 1440),
+            $withUrls,
         );
     }
 
@@ -92,7 +186,7 @@ class Backup
                 app(DumpDatabase::class)->handle($this->config('database.connection'), $dump);
             }
 
-            $filename = Str::slug(config('app.name')).'-'.now()->format('Y-m-d-His').'.zip';
+            $filename = app(ArchiveFilename::class)->make();
             $zip = $temp.'/'.$filename;
 
             app(CreateArchive::class)->handle($zip, $dump, $include, $this->config('files.exclude', []));

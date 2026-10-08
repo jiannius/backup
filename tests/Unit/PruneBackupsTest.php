@@ -12,11 +12,13 @@ it('deletes only this app\'s archives older than the retention period', function
     $disk->put('backups/laravel-2026-06-01-000000.zip', 'new');
     $disk->put('backups/other-2026-01-01-000000.zip', 'unrelated');
     $disk->put('backups/laravel-notes.txt', 'unrelated');
+    $disk->put('backups/laravel-staging-2026-01-01-000000.zip', 'another app whose slug starts with ours');
 
     $stale = now()->subDays(40)->getTimestamp();
     touch($disk->path('backups/laravel-2026-01-01-000000.zip'), $stale);
     touch($disk->path('backups/other-2026-01-01-000000.zip'), $stale);
     touch($disk->path('backups/laravel-notes.txt'), $stale);
+    touch($disk->path('backups/laravel-staging-2026-01-01-000000.zip'), $stale);
 
     (new PruneBackups)->handle('local', 'backups', 30);
 
@@ -24,4 +26,5 @@ it('deletes only this app\'s archives older than the retention period', function
     expect($disk->exists('backups/laravel-2026-06-01-000000.zip'))->toBeTrue();
     expect($disk->exists('backups/other-2026-01-01-000000.zip'))->toBeTrue();
     expect($disk->exists('backups/laravel-notes.txt'))->toBeTrue();
+    expect($disk->exists('backups/laravel-staging-2026-01-01-000000.zip'))->toBeTrue();
 });

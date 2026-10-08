@@ -12,6 +12,21 @@ it('exposes the backup() helper returning the singleton', function () {
     expect(backup()->version())->toBeString()->not->toBeEmpty();
 });
 
+it('ships safe defaults for the ui config', function () {
+    $ui = require __DIR__.'/../../config/backup.php';
+    $ui = $ui['ui'];
+
+    expect($ui['enabled'])->toBeFalse();
+    expect($ui['path'])->toBe('backups');
+    expect($ui['middleware'])->toBe(['web', 'auth']);
+    expect($ui['layout'])->toBeNull();
+    expect($ui['queue']['timeout'])->toBe(1800);
+});
+
+it('reports the 0.3.0 version', function () {
+    expect(backup()->version())->toBe('0.3.0');
+});
+
 it('merges the package config so config(backup.*) is available', function () {
     expect(config('backup.disk'))->toBe('local');
     expect(config('backup.path'))->toBe('backups');
